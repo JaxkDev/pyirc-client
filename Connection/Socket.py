@@ -12,12 +12,16 @@ class Socket:
 
     def connect(self) -> None:
         self.sock.connect((self.host, self.port))
+        self.sock.setblocking(False)
 
     def send(self, data) -> None:
         self.sock.sendall(data)
 
     def receive(self, buffer_size=512) -> bytes:
-        return self.sock.recv(buffer_size)
+        try:
+            return self.sock.recv(buffer_size)
+        except BlockingIOError:
+            return b''
 
     def close(self) -> None:
         self.sock.close()

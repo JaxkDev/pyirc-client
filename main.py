@@ -1,23 +1,23 @@
 from Connection.Server import Server
 
 # Server information
-SERVER = '82.76.255.62'  # 'irc.irchighway.net'
+SERVER = 'bucharest.ro.eu.undernet.org'  #'irc.irchighway.net' # 'irc.freenode.net'
 PORT = 6669
 
 # User information
-NICKNAME = "BooksWithJoe"
+NICKNAME = "joefromfriends"
 
-server = Server(SERVER, PORT)
-server.connect(NICKNAME)
+server = Server(SERVER, PORT, NICKNAME)
+server.connect()
 
 buffer = b""
 while True:
-    data = server.socket.receive(512)
+    data = server._socket.receive(512)
     buffer += data
     lines = buffer.split(b"\r\n")
     buffer = lines.pop()
 
     for line in lines:
         if "PING" in line.decode("utf-8"):
-            server.socket.send(b'PONG ' + line.split()[1] + b'\r\n')
-        print(f"Received: {line!r}")
+            server._socket.send(b'PONG ' + line.split()[1] + b'\r\n')
+        print(f"Received: {line.decode('utf-8')}")
