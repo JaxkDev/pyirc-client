@@ -1,7 +1,7 @@
 from math import floor
 from os import path, mkdir
 from time import time
-from Connection.Socket import Socket
+from App.Connection.Socket import Socket
 
 
 def validateName(name):
@@ -58,9 +58,12 @@ class Server:
     def connect(self):
         self._socket.connect()
         if self.password is not None:
-            self._socket.send('PASS {}\r\n'.format(self.password).encode('utf-8'))
-        self._socket.send('NICK {}\r\n'.format(self.nickname).encode('utf-8'))
-        self._socket.send('USER {} 0 * :{}\r\n'.format(self.nickname, self.real_name).encode('utf-8'))
+            self.send(Message().build("PASS", [self.password]))
+
+        self.send(Message().build("NICK", [self.nickname]))
+        self.send(Message().build("USER", [self.nickname, "0", "*", self.real_name]))
+        # can we assume connected after receiving 001?
+
         # Expect responses 001, 002, 003 and 004 in order.
 
         # for nickname errors:
@@ -79,14 +82,14 @@ class Server:
         # 466: ERR_YOUWILLBEBANNED
 
     def disconnect(self, message='Client closed.'):
-        self._socket.send('QUIT :{}\r\n'.format(message).encode('utf-8'))
+        self.send(Message().build("QUIT", [message]))
         self._socket.close()
 
         self.log("Disconnected from server - " + message)
         self._log.close()
 
     def send(self, message):
-        #message.encode()
+        self.log("Sent: " + str(message))
         self._socket.send(bytes(message))
 
 
@@ -104,47 +107,72 @@ class Message:
         self.tags = tags
         self.source = source
         self.encode()
+        return self
 
     def parse(self, buffer):
         self._buffer = buffer
         self.decode()
 
-    def decode(self):
+    def decode(self, encoding="utf-8"):
         buffer = self._buffer
         self.tags = None
         self.source = None
         self.command = None
         self.parameters = []
 
-        if self._buffer.startswith(b'@'):
-            self.tags, self._buffer = self._buffer[1:].split(b' ', 1)
-            self.tags = self.tags.decode("utf-8")
-        if self._buffer.startswith(b':'):
-            self.source, self._buffer = self._buffer[1:].split(b' ', 1)
-            self.source = self.source.decode("utf-8")
-        self.command, self._buffer = self._buffer.split(b' ', 1)
-        self.command = self.command.decode("utf-8")
-        params = self._buffer.split(b' ')
-        for i in range(len(params)):
-            if params[i].startswith(b':'):
-                self.parameters.append((b" ".join(params[i:]))[1:].decode("utf-8"))
-                break
-            self.parameters.append(params[i].decode("utf-8"))
+        try:
+            if buffer.startswith(b'@'):
+                self.tags, buffer = buffer[1:].split(b' ', 1)
+                self.tags = self.tags.decode(encoding)
+            if buffer.startswith(b':'):
+                self.source, buffer = buffer[1:].split(b' ', 1)
+                self.source = self.source.decode(encoding)
+            self.command, buffer = buffer.split(b' ', 1)
+            self.command = self.command.decode(encoding)
+            params = buffer.split(b' ')
+            for i in range(len(params)):
+                if params[i].startswith(b':'):
+                    self.parameters.append((b" ".join(params[i:]))[1:].decode(encoding))
+                    break
+                self.parameters.append(params[i].decode(encoding))
+        except UnicodeDecodeError:
+            #print("UnicodeDecodeError")
+            if encoding.lower() != "latin-1":
+                # Try latin-1 encoding if all else fails.
+                self.decode("Latin-1")
+            else:
+                raise
+        finally:
+            self._buffer = buffer
 
-    def encode(self):
-        self._buffer = b""
-        if self.tags is not None:
-            self._buffer += b"@" + self.tags.encode("utf-8") + b" "
-        if self.source is not None:
-            self._buffer += b":" + self.source.encode("utf-8") + b" "
-        self._buffer += self.command.encode("utf-8")
-        if self.parameters is not None:
-            # TODO Handle params before : (last param) (breaks login seq)
-            self._buffer += b":" + ((" ".join(self.parameters)).encode("utf-8"))
-        self._buffer += b"\r\n"
+    def encode(self, encoding="utf-8"):
+        buffer = b""
+        try:
+            if self.tags is not None:
+                buffer += b"@" + self.tags.encode(encoding) + b" "
+            if self.source is not None:
+                buffer += b":" + self.source.encode(encoding) + b" "
+            buffer += self.command.encode(encoding) + b" "
+            if self.parameters is not None:
+                if len(self.parameters) > 1:
+                    buffer += (" ".join(self.parameters[:-1])).encode(encoding) + b" "
+                if len(self.parameters) > 0:
+                    buffer += b":" + self.parameters[-1].encode(encoding)
+            buffer += b"\r\n"
+        except UnicodeEncodeError:
+            #print("UnicodeEncodeError")
+            if encoding.lower() != "latin-1":
+                # Try latin-1 encoding if all else fails.
+                self.encode("Latin-1")
+            else:
+                raise
+        finally:
+            self._buffer = buffer
 
     def __bytes__(self):
         return self._buffer
 
     def __str__(self):
-        return self._buffer.decode("utf-8")
+        if self._buffer != b"" and self.command is None:
+            self.decode()
+        return f"Message(tags={self.tags}, source={self.source}, command={self.command}, parameters={self.parameters})"

@@ -17,7 +17,7 @@ class Socket:
     def send(self, data) -> None:
         self.sock.sendall(data)
 
-    def receive(self, buffer_size=512) -> bytes:
+    def receive(self, buffer_size=2048) -> bytes:
         try:
             return self.sock.recv(buffer_size)
         except BlockingIOError:
