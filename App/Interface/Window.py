@@ -1,4 +1,5 @@
-from tkinter import Tk, END, StringVar, Entry, Menu, Toplevel
+from tkinter import Tk, END, StringVar, Menu, Toplevel
+from tkinter.ttk import Notebook, Frame, Button, OptionMenu, Label, Entry
 from tkinter.scrolledtext import ScrolledText
 from webbrowser import open_new as open_url
 
@@ -17,7 +18,7 @@ class Window:
         self.chat_box.vbar.forget()
 
         self.input_var = StringVar()
-        self.input_entry = Entry(self.window, textvariable=self.input_var, border=2, font='Arial 12 bold',
+        self.input_entry = Entry(self.window, textvariable=self.input_var, font='Arial 12 bold',
                                  background="white", foreground="black")
         self.input_entry.focus()
         self.input_entry.configure(state="readonly")
@@ -86,6 +87,9 @@ class Window:
         pref = Preferences(self.window)
         pref.grab_set()
         pref.focus_force()
+        self.top = False
+        self.window.wait_window(pref)
+        self.top = True
 
     def insert_chat(self, text, tag="chat", prefix="\n", suffix=""):
         self.chat_box.configure(state='normal')
@@ -108,8 +112,84 @@ class Preferences(Toplevel):
         super().__init__(parent)
         self.geometry('400x500')
         self.title("Preferences")
+        self.build()
 
         # Keep on top.
         self.grab_set()
         self.wm_transient(parent)
         self.attributes('-topmost', 'true')
+
+    def build(self):
+        tab_control = Notebook(self)
+
+        general_tab = Frame(tab_control, borderwidth=20)
+        general_tab.grid_columnconfigure((0, 1), weight=1)
+        user_tab = Frame(tab_control, borderwidth=20)
+        user_tab.grid_columnconfigure((0, 1), weight=1)
+        servers_tab = Frame(tab_control, borderwidth=20)
+        servers_tab.grid_columnconfigure((0, 1), weight=1)
+
+        tab_control.add(general_tab, text='General')
+        tab_control.add(user_tab, text='User')
+        tab_control.add(servers_tab, text='Servers')
+        tab_control.pack(expand=1, fill="both")
+
+        def save():
+            print("Saved")
+        save_button = Button(self, text="Save", command=save)
+        save_button.pack(side="right", padx=(0, 20), pady=(0, 10))
+        cancel_button = Button(self, text="Cancel", command=self.destroy)
+        cancel_button.pack(side="right", padx=(0, 5), pady=(0, 10))
+
+        auto_connect_label = Label(general_tab, text="Auto connect:")
+        Tooltip(auto_connect_label, "Choose the server to automatically connect to when the app next starts.\nChoose "
+                                    "None to not automatically connect.")
+        auto_connect_var = StringVar(general_tab)
+        vars = ["1", "2", "3", "4"]
+        auto_connect_entry = OptionMenu(general_tab, auto_connect_var, "None", "None", *vars)
+        auto_connect_entry.config(width=10)
+
+        auto_connect_label.grid(row=1, column=0, sticky="e")
+        auto_connect_entry.grid(row=1, column=1, sticky="w", padx=10)
+
+        nickname_label = Label(user_tab, text="Nickname:")
+        username_label = Label(user_tab, text="Username:")
+        realname_label = Label(user_tab, text="Real Name:")
+
+        nickname_entry = Entry(user_tab)
+        username_entry = Entry(user_tab)
+        realname_entry = Entry(user_tab)
+
+        nickname_label.grid(row=1, column=0, sticky="e")
+        nickname_entry.grid(row=1, column=1, sticky="w", padx=10)
+        username_label.grid(row=2, column=0, sticky="e")
+        username_entry.grid(row=2, column=1, sticky="w", padx=10)
+        realname_label.grid(row=3, column=0, sticky="e")
+        realname_entry.grid(row=3, column=1, sticky="w", padx=10)
+
+
+class Tooltip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip = None
+        self.widget.bind("<Enter>", self.show)
+        self.widget.bind("<Leave>", self.hide)
+
+    def show(self, event=None):
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+
+        self.tooltip = Toplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        self.tooltip.wm_geometry(f"+{x}+{y}")
+
+        label = Label(self.tooltip, text=self.text, foreground="black", background="#ffffe0", relief="solid",
+                      borderwidth=1)
+        label.pack()
+
+    def hide(self, event=None):
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
