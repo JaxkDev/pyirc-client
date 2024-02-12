@@ -8,30 +8,32 @@ class Window:
     def __init__(self, application):
         self.top = True
         self.app = application
-        self.window = Tk("IRC Client", "IRC Client", "IRC Client")
-        self.window.geometry('1000x700')
+        self.window = Tk("  PY-IRC Client", "PY-IRC Client", "PY-IRC Client")
+        self.window.geometry('1000x800')
         self.window.resizable(False, False)
-        self.window.title("IRC Client - Not logged in")
+        self.window.title("-- Not logged in --")
 
-        self.chat_box = ScrolledText(self.window, height=40, background="#555555", foreground="aqua",
-                                     font='Arial 12 bold', border=2)
+        self.chat_box = ScrolledText(self.window, background="#555555", font='Arial 10 bold', border=2, relief="solid")  # TODO Sort out height based on font and pixel and yeah
         self.chat_box.vbar.forget()
 
         self.input_var = StringVar()
-        self.input_entry = Entry(self.window, textvariable=self.input_var, font='Arial 12 bold',
+        self.input_entry = Entry(self.window, textvariable=self.input_var, font='Arial 10 bold',
                                  background="white", foreground="black")
         self.input_entry.focus()
         self.input_entry.configure(state="readonly")
-        self.input_entry.bind("<Return>", lambda e: self.app.handle_input(self.input_var.get()) or self.input_var.set(""))
+        self.input_entry.bind("<Return>",
+                              lambda e: self.app.handle_input(self.input_var.get()) or self.input_var.set(""))
 
-        self.log_box = ScrolledText(self.window, height=10, font='Arial 12 italic', background="#202020")
+        self.log_box = ScrolledText(self.window, font='Arial 10 italic', background="#202020", border=2, relief="solid")
+        self.log_box.frame.config(width="100", height="100")
         self.log_box.vbar.forget()
 
         self._register_tags()
 
-        self.chat_box.pack(expand=True, fill='x')
-        self.input_entry.pack(expand=True, fill='x')
-        self.log_box.pack(expand=True, fill='x')
+        self.chat_box.grid(row=0, column=0, sticky="nsew")
+        self.input_entry.grid(row=1, column=0, sticky="nsew")
+        self.log_box.grid(row=2, column=0, sticky="nsew")
+        self.window.grid_columnconfigure(0, weight=1)
 
         self.chat_box.configure(state='normal')
         self.chat_box.insert(END, "Server notices and channel chat will appear here.", 'app_notice')
@@ -44,7 +46,6 @@ class Window:
         self._register_menubar()
 
     def _register_menubar(self, server_connect=True, server_disconnect=False):
-
         def donothing():
             pass
 
@@ -55,26 +56,28 @@ class Window:
         menubar = Menu(self.window)
 
         filemenu = Menu(menubar, tearoff=0)
-        filemenu.add_command(label="Preferences", command=pref)
+        filemenu.add_command(label="Preferences", command=lambda: self.open_preferences())
         filemenu.add_separator()
         filemenu.add_command(label="Exit", command=self.window.destroy)
         menubar.add_cascade(label="File", menu=filemenu)
 
         servermenu = Menu(menubar, tearoff=0)
-        servermenu.add_command(label="Connect", command=donothing, state="normal" if server_connect else "disabled")
-        servermenu.add_command(label="Disconnect", command=donothing, state="normal" if server_disconnect else "disabled")
+        servermenu.add_command(label="Connect", command=donothing,
+                               state="normal" if server_connect else "disabled")
+        servermenu.add_command(label="Disconnect", command=donothing,
+                               state="normal" if server_disconnect else "disabled")
         menubar.add_cascade(label="Server", menu=servermenu)
 
         helpmenu = Menu(menubar, tearoff=0)
         helpmenu.add_command(label="About", command=donothing)
         helpmenu.add_command(label="GitHub Repository",
-                             command=lambda: open_url("https://github.com/JaxkDev/irc-ebooks"))
+                             command=lambda: open_url("https://github.com/JaxkDev/pyirc-client"))
         menubar.add_cascade(label="Help", menu=helpmenu)
         self.window.config(menu=menubar)
 
     def _register_tags(self):
         self.chat_box.tag_config('app_notice', foreground='lightgreen')
-        self.log_box.tag_config('app_error', foreground='red')
+        self.chat_box.tag_config('app_error', foreground='red')
         self.chat_box.tag_config('chat', foreground='aqua')
         self.chat_box.tag_config('error', foreground='red')
 
@@ -84,6 +87,8 @@ class Window:
         self.log_box.tag_config('error', foreground='red')
 
     def open_preferences(self):
+        if not self.top:
+            return
         pref = Preferences(self.window)
         pref.grab_set()
         pref.focus_force()
@@ -136,6 +141,7 @@ class Preferences(Toplevel):
 
         def save():
             print("Saved")
+
         save_button = Button(self, text="Save", command=save)
         save_button.pack(side="right", padx=(0, 20), pady=(0, 10))
         cancel_button = Button(self, text="Cancel", command=self.destroy)
