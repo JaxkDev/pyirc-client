@@ -10,14 +10,14 @@ class Window:
         self.top = True
         self.app = application
         self.window = Tk("  PY-IRC Client", "PY-IRC Client", "PY-IRC Client")
-        self.window.geometry('800x600')
-        self.window.minsize(800, 600)
+        self.window.geometry('800x700')
+        self.window.minsize(800, 700)
         self.window.title("-- Not logged in --")
 
         self.chat_box = ScrolledText(self.window, background="#555555", font='Arial 12 bold', border=2, relief="solid",
                                      inactiveselectbackground="black")
         # TODO Sort out height based on font and pixel and yeah lot of messy stuff.
-        #self.chat_box.vbar.forget()
+        self.chat_box.vbar.forget()
 
         self.input_var = StringVar()
         self.input_entry = Entry(self.window, textvariable=self.input_var, font='Arial 12 bold',
