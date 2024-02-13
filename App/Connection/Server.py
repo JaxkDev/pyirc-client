@@ -1,6 +1,6 @@
 from math import floor
 from os import path, mkdir
-from time import time
+from time import time, sleep
 from App.Connection.Socket import Socket
 
 
@@ -27,15 +27,17 @@ def validateName(name):
 
 
 class Server:
-    def __init__(self, host, port, nickname, real_name=None, password=None):
+    def __init__(self, outbound_queue, inbound_queue, host, port, nickname, username, real_name, password=None):
+        self.inbound_queue = inbound_queue
+        self.outbound_queue = outbound_queue
+
         self._socket = Socket(host, port)
         self.nickname = nickname
+        self.username = username
+        self.real_name = real_name
         validateName(nickname)
-        if real_name is not None:
-            self.real_name = real_name
-            validateName(real_name)
-        else:
-            self.real_name = nickname
+        validateName(username)
+        validateName(real_name)
         self.password = password
 
         self._setupLogging()
@@ -61,7 +63,9 @@ class Server:
             self.send(Message().build("PASS", [self.password]))
 
         self.send(Message().build("NICK", [self.nickname]))
-        self.send(Message().build("USER", [self.nickname, "0", "*", self.real_name]))
+        self.send(Message().build("USER", [self.username, "0", "*", self.real_name]))
+        sleep(10)
+        self.send(Message().build("JOIN", ["#ebooks"]))
         # can we assume connected after receiving 001?
 
         # Expect responses 001, 002, 003 and 004 in order.
@@ -87,6 +91,32 @@ class Server:
 
         self.log("Disconnected from server - " + message)
         self._log.close()
+
+        exit(0)
+
+    def loop(self):
+        buffer = b""
+        while True:
+            sleep(0.05)
+            if self._socket is None:
+                exit()
+
+            for message in self.outbound_queue:
+                self.send(message)
+                self.outbound_queue.remove(message)
+
+            data = self._socket.receive(2048)
+            buffer += data
+            if buffer.count(b"\r\n") == 0:
+                continue
+            lines = buffer.split(b"\r\n")
+            buffer = lines.pop()
+
+            for line in lines:
+                message = Message(line)
+                message.decode()
+                self.log("Received: " + str(message))
+                self.inbound_queue.append(message)
 
     def send(self, message):
         self.log("Sent: " + str(message))

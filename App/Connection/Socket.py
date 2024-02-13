@@ -15,9 +15,13 @@ class Socket:
         self.sock.setblocking(False)
 
     def send(self, data) -> None:
+        if self.sock is None:
+            return
         self.sock.sendall(data)
 
     def receive(self, buffer_size=2048) -> bytes:
+        if self.sock is None:
+            return b''
         try:
             return self.sock.recv(buffer_size)
         except BlockingIOError:
@@ -25,3 +29,4 @@ class Socket:
 
     def close(self) -> None:
         self.sock.close()
+        self.sock = None

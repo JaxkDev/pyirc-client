@@ -14,26 +14,27 @@ class Window:
         self.window.minsize(800, 600)
         self.window.title("-- Not logged in --")
 
-        self.chat_box = ScrolledText(self.window, background="#555555", font='Arial 10 bold', border=2, relief="solid",
+        self.chat_box = ScrolledText(self.window, background="#555555", font='Arial 12 bold', border=2, relief="solid",
                                      inactiveselectbackground="black")
         # TODO Sort out height based on font and pixel and yeah lot of messy stuff.
-        self.chat_box.vbar.forget()
+        #self.chat_box.vbar.forget()
 
         self.input_var = StringVar()
-        self.input_entry = Entry(self.window, textvariable=self.input_var, font='Arial 10 bold',
+        self.input_entry = Entry(self.window, textvariable=self.input_var, font='Arial 12 bold',
                                  background="white", foreground="black")
         self.input_entry.focus()
         self.input_entry.configure(state="readonly")
+        # TEMP
+        self.input_entry.configure(state="normal")
         self.input_entry.bind("<Return>",
                               lambda e: self.app.handle_input(self.input_var.get()) or self.input_var.set(""))
 
-        self.log_box = ScrolledText(self.window, font='Arial 10 italic', background="#202020", border=2, relief="solid")
-        self.log_box.frame.config(width="100", height="100")
+        self.log_box = ScrolledText(self.window, font='Arial 12 italic', background="#202020", border=2, relief="solid")
         self.log_box.vbar.forget()
 
         self._register_tags()
 
-        self.chat_box.config(height="40", wrap="word")
+        self.chat_box.config(height="30", wrap="word")
         self.chat_box.pack(fill="x")
         self.input_entry.pack(fill="x")
         self.log_box.pack(expand=True, fill="both")
