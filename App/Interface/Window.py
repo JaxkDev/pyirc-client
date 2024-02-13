@@ -1,4 +1,5 @@
-from tkinter import Tk, END, StringVar, Menu, Toplevel
+from tkinter import Tk, END, StringVar, Menu, Toplevel, Listbox, Variable
+from tkinter.filedialog import asksaveasfilename, askopenfilename
 from tkinter.ttk import Notebook, Frame, Button, OptionMenu, Label, Entry
 from tkinter.scrolledtext import ScrolledText
 from webbrowser import open_new as open_url
@@ -9,11 +10,13 @@ class Window:
         self.top = True
         self.app = application
         self.window = Tk("  PY-IRC Client", "PY-IRC Client", "PY-IRC Client")
-        self.window.geometry('1000x800')
-        self.window.resizable(False, False)
+        self.window.geometry('800x600')
+        self.window.minsize(800, 600)
         self.window.title("-- Not logged in --")
 
-        self.chat_box = ScrolledText(self.window, background="#555555", font='Arial 10 bold', border=2, relief="solid")  # TODO Sort out height based on font and pixel and yeah
+        self.chat_box = ScrolledText(self.window, background="#555555", font='Arial 10 bold', border=2, relief="solid",
+                                     inactiveselectbackground="black")
+        # TODO Sort out height based on font and pixel and yeah lot of messy stuff.
         self.chat_box.vbar.forget()
 
         self.input_var = StringVar()
@@ -30,9 +33,10 @@ class Window:
 
         self._register_tags()
 
-        self.chat_box.grid(row=0, column=0, sticky="nsew")
-        self.input_entry.grid(row=1, column=0, sticky="nsew")
-        self.log_box.grid(row=2, column=0, sticky="nsew")
+        self.chat_box.config(height="40", wrap="word")
+        self.chat_box.pack(fill="x")
+        self.input_entry.pack(fill="x")
+        self.log_box.pack(expand=True, fill="both")
         self.window.grid_columnconfigure(0, weight=1)
 
         self.chat_box.configure(state='normal')
@@ -45,13 +49,9 @@ class Window:
 
         self._register_menubar()
 
-    def _register_menubar(self, server_connect=True, server_disconnect=False):
-        def donothing():
+    def _register_menubar(self, server_connected=False):
+        def do_nothing():
             pass
-
-        def pref():
-            if self.top:
-                self.open_preferences()
 
         menubar = Menu(self.window)
 
@@ -62,14 +62,19 @@ class Window:
         menubar.add_cascade(label="File", menu=filemenu)
 
         servermenu = Menu(menubar, tearoff=0)
-        servermenu.add_command(label="Connect", command=donothing,
-                               state="normal" if server_connect else "disabled")
-        servermenu.add_command(label="Disconnect", command=donothing,
-                               state="normal" if server_disconnect else "disabled")
+        servermenu.add_command(label="Connect", command=do_nothing,
+                               state="normal" if not server_connected else "disabled")
+        servermenu.add_command(label="Disconnect", command=do_nothing,
+                               state="normal" if server_connected else "disabled")
+        servermenu.add_separator()
+        servermenu.add_command(label="Information", command=do_nothing,
+                               state="normal" if server_connected else "disabled")
+        servermenu.add_command(label="Users", command=do_nothing, state="normal" if server_connected else "disabled")
+        servermenu.add_command(label="Channels", command=do_nothing, state="normal" if server_connected else "disabled")
         menubar.add_cascade(label="Server", menu=servermenu)
 
         helpmenu = Menu(menubar, tearoff=0)
-        helpmenu.add_command(label="About", command=donothing)
+        helpmenu.add_command(label="About", command=do_nothing)
         helpmenu.add_command(label="GitHub Repository",
                              command=lambda: open_url("https://github.com/JaxkDev/pyirc-client"))
         menubar.add_cascade(label="Help", menu=helpmenu)
@@ -89,7 +94,7 @@ class Window:
     def open_preferences(self):
         if not self.top:
             return
-        pref = Preferences(self.window)
+        pref = Preferences(self.window, self.app)
         pref.grab_set()
         pref.focus_force()
         self.top = False
@@ -112,10 +117,13 @@ class Window:
         self.window.mainloop()
 
 
+# noinspection PyTypeChecker
 class Preferences(Toplevel):
-    def __init__(self, parent):
+    def __init__(self, parent, app):
         super().__init__(parent)
+        self.app = app
         self.geometry('400x500')
+        self.minsize(400, 500)
         self.title("Preferences")
         self.build()
 
@@ -139,39 +147,172 @@ class Preferences(Toplevel):
         tab_control.add(servers_tab, text='Servers')
         tab_control.pack(expand=1, fill="both")
 
-        def save():
-            print("Saved")
-
-        save_button = Button(self, text="Save", command=save)
-        save_button.pack(side="right", padx=(0, 20), pady=(0, 10))
-        cancel_button = Button(self, text="Cancel", command=self.destroy)
+        save_button = Button(self, text="Save", command=lambda: self.save(), width=4)
+        save_button.pack(side="right", padx=(0, 15), pady=(0, 10))
+        cancel_button = Button(self, text="Cancel", command=self.destroy, width=5)
         cancel_button.pack(side="right", padx=(0, 5), pady=(0, 10))
+        import_button = Button(self, text="Import", command=lambda: self.load(), width=5)
+        import_button.pack(side="left", padx=(15, 0), pady=(0, 10))
+        export_button = Button(self, text="Export", command=lambda: self.export(), width=5)
+        export_button.pack(side="left", padx=(5, 0), pady=(0, 10))
 
+        # Load
+        self.data = self.app.preferences
+        if self.data is None:
+            self.data = {"auto_connect": "None", "user": {"nickname": "", "real_name": "", "username": ""}, "servers":
+                {0: {"name": "New Server", "ip": "0.0.0.0", "port": 6667, "password": ""}}}
+        self.servers = self.data["servers"]
+        self.server_names = []
+        for server in self.servers.keys():
+            self.server_names.append(self.servers[server]["name"])
+
+        # General tab
         auto_connect_label = Label(general_tab, text="Auto connect:")
         Tooltip(auto_connect_label, "Choose the server to automatically connect to when the app next starts.\nChoose "
                                     "None to not automatically connect.")
-        auto_connect_var = StringVar(general_tab)
-        vars = ["1", "2", "3", "4"]
-        auto_connect_entry = OptionMenu(general_tab, auto_connect_var, "None", "None", *vars)
-        auto_connect_entry.config(width=10)
+        self.auto_connect_var = StringVar(general_tab)
+        self.auto_connect_entry = OptionMenu(general_tab, self.auto_connect_var, self.data["auto_connect"],
+                                             *self.server_names)
+        self.auto_connect_entry.config(width=10)
 
         auto_connect_label.grid(row=1, column=0, sticky="e")
-        auto_connect_entry.grid(row=1, column=1, sticky="w", padx=10)
+        self.auto_connect_entry.grid(row=1, column=1, sticky="w", padx=10)
+
+        # User tab
 
         nickname_label = Label(user_tab, text="Nickname:")
+        Tooltip(nickname_label, "The name you will be known as on the server.")
         username_label = Label(user_tab, text="Username:")
+        Tooltip(username_label, "The name you will use to log in to the server.")
         realname_label = Label(user_tab, text="Real Name:")
+        Tooltip(realname_label, "Your 'real name', or a pseudonym if you prefer.\nYou can use any name you like it is "
+                                "not checked.")
 
-        nickname_entry = Entry(user_tab)
-        username_entry = Entry(user_tab)
-        realname_entry = Entry(user_tab)
+        self.nickname_entry = Entry(user_tab)
+        self.nickname_entry.insert(0, self.data["user"]["nickname"])
+        self.username_entry = Entry(user_tab)
+        self.username_entry.insert(0, self.data["user"]["username"])
+        self.realname_entry = Entry(user_tab)
+        self.realname_entry.insert(0, self.data["user"]["real_name"])
 
         nickname_label.grid(row=1, column=0, sticky="e")
-        nickname_entry.grid(row=1, column=1, sticky="w", padx=10)
+        self.nickname_entry.grid(row=1, column=1, sticky="w", padx=10)
         username_label.grid(row=2, column=0, sticky="e")
-        username_entry.grid(row=2, column=1, sticky="w", padx=10)
+        self.username_entry.grid(row=2, column=1, sticky="w", padx=10)
         realname_label.grid(row=3, column=0, sticky="e")
-        realname_entry.grid(row=3, column=1, sticky="w", padx=10)
+        self.realname_entry.grid(row=3, column=1, sticky="w", padx=10)
+
+        # Servers tab
+
+        server_names_var = Variable(value=self.server_names)
+        server_list = Listbox(servers_tab, listvariable=server_names_var, selectmode="single", width=30, height=10,
+                              borderwidth=2, relief="solid")
+
+        self._prev_server = None
+
+        def change_server():
+            server_name_entry.config(state="normal")
+            server_host_entry.config(state="normal")
+            server_port_entry.config(state="normal")
+            server_password_entry.config(state="normal")
+            if self._prev_server is not None:
+                data = {"name": server_name_entry.get(), "ip": server_host_entry.get(),
+                        "port": int(server_port_entry.get()),
+                        "password": server_password_entry.get()}
+                self.servers[self._prev_server] = data
+
+                # Update server names in case of change
+                self.server_names = []
+                for server in self.servers.keys():
+                    self.server_names.append(self.servers[server]["name"])
+                server_names_var.set(self.server_names)
+
+                # Update other preferences that use server name/data.
+                # self.auto_connect_entry.set_menu(self.auto_connect_entry.selection_get(), *self.server_names)
+
+            selected = server_names_var.get()[server_list.curselection()[0]]
+            _server = None
+            for s in self.servers.keys():
+                _server = self.servers[s]
+                if _server["name"] == selected:
+                    self._prev_server = s
+                    break
+            if self._prev_server is None or _server is None:
+                raise ValueError("Server not found.")
+            server_name_entry.delete(0, "end")
+            server_host_entry.delete(0, "end")
+            server_port_entry.delete(0, "end")
+            server_password_entry.delete(0, "end")
+            server_name_entry.insert(0, _server["name"])
+            server_host_entry.insert(0, _server["ip"])
+            server_port_entry.insert(0, _server["port"])
+            server_password_entry.insert(0, _server["password"])
+
+        server_name_label = Label(servers_tab, text="Server Name:")
+        Tooltip(server_name_label, "A name to remember the server by.\nThis is not the server's IP/Specific name.")
+        server_host_label = Label(servers_tab, text="Server Host:")
+        Tooltip(server_host_label, "The IP or hostname of the server.")
+        server_port_label = Label(servers_tab, text="Server Port:")
+        Tooltip(server_port_label, "The port the server is running on.\nDefault is 6667.")
+        server_password_label = Label(servers_tab, text="Server Password:", width=14)
+        Tooltip(server_password_label, "The password to use when connecting to the server.\nLeave blank if no "
+                                       "password is required.")
+
+        server_name_entry = Entry(servers_tab, state="readonly")
+        server_host_entry = Entry(servers_tab, state="readonly")
+        server_port_entry = Entry(servers_tab, state="readonly")
+        server_password_entry = Entry(servers_tab, state="readonly")
+
+        server_list.grid(row=0, column=0, columnspan=2, sticky="nsew", pady=(0, 5))
+        server_name_label.grid(row=1, column=0, sticky="e")
+        server_name_entry.grid(row=1, column=1, sticky="w", padx=10)
+        server_host_label.grid(row=2, column=0, sticky="e")
+        server_host_entry.grid(row=2, column=1, sticky="w", padx=10)
+        server_port_label.grid(row=3, column=0, sticky="e")
+        server_port_entry.grid(row=3, column=1, sticky="w", padx=10)
+        server_password_label.grid(row=4, column=0, sticky="e")
+        server_password_entry.grid(row=4, column=1, sticky="w", padx=10)
+
+        server_list.bind('<<ListboxSelect>>', lambda e: change_server())
+
+    def save(self, file=None):
+        # TODO Save any temp changes in servers.
+
+        # Validate
+        auto = self.auto_connect_var.get()
+        nickname = self.nickname_entry.get().strip()
+        realname = self.realname_entry.get().strip()
+        username = self.username_entry.get().strip()
+        # servers = self.servers
+
+        if nickname == "":
+            print("Nickname is empty.")
+            return
+        if realname == "":
+            print("Real Name is empty.")
+            return
+        if username == "":
+            print("Username is empty.")
+            return
+
+        # Save
+        self.app.preferences = {"auto_connect": auto,
+                                "user": {"nickname": nickname, "real_name": realname, "username": username},
+                                "servers": self.servers}
+        self.app.save_preferences(file)
+
+    def load(self):
+        f = askopenfilename(defaultextension=".json", filetypes=[("JSON", "*.json")], title="Import Preferences")
+        if f is None or f == "":
+            return
+        #Todo
+        #self.app.load_preferences(f)
+
+    def export(self):
+        f = asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")], title="Export Preferences")
+        if f is None or f == "":
+            return
+        self.save(f)
 
 
 class Tooltip:
@@ -179,10 +320,10 @@ class Tooltip:
         self.widget = widget
         self.text = text
         self.tooltip = None
-        self.widget.bind("<Enter>", self.show)
-        self.widget.bind("<Leave>", self.hide)
+        self.widget.bind("<Enter>", lambda e: self.show())
+        self.widget.bind("<Leave>", lambda e: self.hide())
 
-    def show(self, event=None):
+    def show(self):
         x, y, _, _ = self.widget.bbox("insert")
         x += self.widget.winfo_rootx() + 25
         y += self.widget.winfo_rooty() + 25
@@ -191,11 +332,10 @@ class Tooltip:
         self.tooltip.wm_overrideredirect(True)
         self.tooltip.wm_geometry(f"+{x}+{y}")
 
-        label = Label(self.tooltip, text=self.text, foreground="black", background="#ffffe0", relief="solid",
-                      borderwidth=1)
-        label.pack()
+        label = Label(self.tooltip, text="  " + self.text.replace("\n", "\n  "), relief="solid", borderwidth=1)
+        label.pack(ipady=4, ipadx=4)
 
-    def hide(self, event=None):
-        if self.tooltip:
+    def hide(self):
+        if self.tooltip is not None:
             self.tooltip.destroy()
             self.tooltip = None
