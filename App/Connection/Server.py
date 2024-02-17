@@ -87,12 +87,12 @@ class Server:
 
     def disconnect(self, message='Client closed.'):
         self.send(Message().build("QUIT", [message]))
+        sleep(0.1)
         self._socket.close()
+        self._socket = None
 
         self.log("Disconnected from server - " + message)
         self._log.close()
-
-        exit(0)
 
     def loop(self):
         buffer = b""
