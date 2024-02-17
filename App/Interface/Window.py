@@ -95,7 +95,7 @@ class Window:
     def open_preferences(self):
         if not self.top:
             return
-        pref = Preferences(self.window, self.app)
+        pref = PreferencesWindow(self.window, self.app)
         pref.grab_set()
         pref.focus_force()
         self.top = False
@@ -117,9 +117,12 @@ class Window:
     def main_loop(self):
         self.window.mainloop()
 
+    def quit(self):
+        self.window.quit()
+
 
 # noinspection PyTypeChecker
-class Preferences(Toplevel):
+class PreferencesWindow(Toplevel):
     def __init__(self, parent, app):
         super().__init__(parent)
         self.app = app

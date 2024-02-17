@@ -14,15 +14,13 @@ class Application:
         self.inbound_queue = []
         self.outbound_queue = []
         self.server = None
+        self.thread = None
         self.preferences = None
         self.preferences_file = "preferences.json"
         self.window = Window(self)
         self.window.window.after(1, self.start)
         self.window.main_loop()
-        if self.server is not None:
-            self.window.window.quit()
-            self.server.disconnect()
-            self.thread.join()
+        self.exit()
 
     def start(self):
         self.window.insert_log("Application version: " + VERSION, "app_notice")
@@ -51,13 +49,16 @@ class Application:
 
     def tick(self):
         self.window.window.after(20, self.tick)
-        if len(self.inbound_queue) > 0:
+        while len(self.inbound_queue) > 0:
             message = self.inbound_queue.pop(0)
+            if message.command == "PING":
+                self.server.send(Message().build("PONG", [message.parameters[0]]))
+                continue
+            # TODO ServerHandler here.
             # TODO Handle message from server.
             timestamp = strftime("%H:%M:%S", gmtime())
             params = (" ".join(message.parameters)) if len(message.parameters) > 0 else ""
             self.window.insert_chat(f"{timestamp} | {message.command} > {params}", "chat")
-
 
     def handle_input(self, text):
         if self.server is None:
@@ -113,6 +114,12 @@ class Application:
         self.window.insert_log(
             "Preferences saved to '" + self.preferences_file + "'",
             "app_notice")
+
+    def exit(self):
+        self.window.quit()
+        if self.server is not None:
+            self.server.disconnect()
+            self.thread.join()
 
 
 def validate_preferences(preferences) -> bool:
